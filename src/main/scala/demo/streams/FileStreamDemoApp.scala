@@ -3,11 +3,10 @@ package demo.streams
 import java.nio.file.Paths
 
 import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, IOResult}
+import akka.stream.ActorMaterializer
+import akka.stream.alpakka.csv.scaladsl.CsvParsing
 import akka.stream.scaladsl.{FileIO, Flow, Framing, Sink}
 import akka.util.ByteString
-
-import scala.concurrent.Future
 
 case class LineElement(val1: String, val2: String, val3: String) {
   override def toString: String = s"Val 1: $val1, Val 2: $val2, Val 3: $val3"
@@ -34,7 +33,19 @@ object FileStreamDemoApp extends App {
 
   fileSource.
     via(lineFlow).
-    to(sink).run()
+    runWith(sink)
+
+  val fileCsv = Paths.get("example.csv")
+  println("Reading file: " + fileCsv.toAbsolutePath)
+
+  val objectListFlow = Flow[List[String]].map(l => LineElement(l.head, l(1), l(2)))
+
+  //Example of csv read using alpakka
+  FileIO.fromPath(fileCsv)
+    .via(CsvParsing.lineScanner())
+    .map(_.map(_.utf8String))
+    .via(objectListFlow)
+    .runWith(sink)
 
   actorSystem.terminate
 }
